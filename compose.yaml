@@ -1,0 +1,92 @@
+# Chạy Laravel app + Python orchestrator (companion backend) + MySQL.
+#
+#   docker compose up -d --build
+#   docker compose run --rm watcher claude            # đăng nhập Claude Code một lần
+#
+# Laravel:   http://localhost:8000
+# Dashboard: http://localhost:8787
+#
+# Biến DOCKER_* / AI_FIX_BACKEND_PATH có thể đặt trong shell hoặc file .env của project này.
+# Prefix DOCKER_ tránh đụng biến Laravel (DB_PASSWORD...) mà Compose cũng đọc từ .env.
+
+x-orchestrator: &orchestrator
+  build:
+    context: ${AI_FIX_BACKEND_PATH:-../demo-agent-ai-auto-fix-bug-backend}
+  environment:
+    AI_FIX_DATABASE_URL: mysql://aifix:${DOCKER_AIFIX_DB_PASSWORD:-aifix-secret}@mysql:3306/ai_fix_orchestrator
+  volumes:
+    - ${AI_FIX_BACKEND_PATH:-../demo-agent-ai-auto-fix-bug-backend}:/app
+    # source_repo: orchestrator tạo git worktree/branch từ checkout này và đọc laravel.log.
+    - .:/workspace/laravel
+    - orchestrator-worktrees:/var/lib/ai-fix/worktrees
+    # HOME chứa credentials Claude Code + cache composer/npm.
+    - orchestrator-home:/home/aifix
+  depends_on:
+    mysql:
+      condition: service_healthy
+  restart: unless-stopped
+
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DOCKER_MYSQL_ROOT_PASSWORD:-root-secret}
+      MYSQL_DATABASE: demo_agent_ai_auto_fix_bug
+      MYSQL_USER: laravel
+      MYSQL_PASSWORD: ${DOCKER_LARAVEL_DB_PASSWORD:-laravel-secret}
+      AIFIX_DB_PASSWORD: ${DOCKER_AIFIX_DB_PASSWORD:-aifix-secret}
+    ports:
+      - "127.0.0.1:${DOCKER_MYSQL_PORT:-3307}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  app:
+    build: ./docker/app
+    image: demo-agent-laravel:local
+    environment:
+      # Env của container ghi đè giá trị trong .env (Dotenv không overwrite).
+      APP_URL: http://localhost:8000
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: demo_agent_ai_auto_fix_bug
+      DB_USERNAME: laravel
+      DB_PASSWORD: ${DOCKER_LARAVEL_DB_PASSWORD:-laravel-secret}
+      PHP_CLI_SERVER_WORKERS: 4
+    ports:
+      - "127.0.0.1:${DOCKER_APP_PORT:-8000}:8000"
+    volumes:
+      - .:/var/www/html
+      - app-node-modules:/var/www/html/node_modules
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
+
+  watcher:
+    <<: *orchestrator
+    command: ["python", "-m", "autofix_agent", "watch", "--config", "config/docker.json"]
+
+  dashboard:
+    <<: *orchestrator
+    command: ["python", "-m", "autofix_agent", "ui", "--config", "config/docker.json"]
+    environment:
+      AI_FIX_DATABASE_URL: mysql://aifix:${DOCKER_AIFIX_DB_PASSWORD:-aifix-secret}@mysql:3306/ai_fix_orchestrator
+      # Bind mọi interface trong container; port chỉ publish ra loopback của host.
+      AI_FIX_UI_BIND_HOST: 0.0.0.0
+    ports:
+      # Port host phải trùng 8787: dashboard kiểm tra Host header = localhost:8787.
+      - "127.0.0.1:8787:8787"
+
+volumes:
+  mysql-data:
+  app-node-modules:
+  orchestrator-worktrees:
+  orchestrator-home:
