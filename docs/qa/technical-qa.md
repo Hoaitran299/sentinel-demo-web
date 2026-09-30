@@ -110,14 +110,14 @@ sổ thời gian. Watcher áp dụng ngay, không cần restart.
 
 Backend đọc được log qua `AI_FIX_LOG_SOURCE`: file local, HTTP Range (nginx có auth), SSH,
 hoặc S3-compatible storage (AWS S3, Cloudflare R2, MinIO). App Laravel không cần thay đổi;
-chỉ cần expose/đẩy file log. Chi tiết trong `docs/log-sources.md` của backend.
+chỉ cần expose/đẩy file log. Chi tiết trong `docs/setup/log-sources.md` của `sentinel-agent`.
 
 ### Có thông báo khi agent chạy không?
 
 Có. Backend gửi Telegram khi lỗi đạt ngưỡng và agent bắt đầu, khi fix pass verification
 (kèm link PR), khi run dừng vì lỗi, và khi PR được merge hoặc bị đóng. Notifier chạy trong
 watcher của backend, không nằm trong Laravel; bot token chỉ ở `.env` backend và không bao
-giờ được đưa cho Claude. Xem `docs/telegram.md` trong backend.
+giờ được đưa cho Claude. Xem `docs/setup/telegram.md` trong `sentinel-agent`.
 
 ### Agent có tự merge/deploy không?
 

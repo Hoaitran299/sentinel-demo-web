@@ -31,7 +31,7 @@ project backend và không phụ thuộc các artifact này.
 ## Cài đặt (Docker)
 
 Project chỉ hỗ trợ chạy bằng Docker; `compose.yaml` chạy Laravel, MySQL và orchestrator
-`../sentinel-agent` cùng lúc. Chi tiết: [docs/docker.md](docs/docker.md).
+`../sentinel-agent` cùng lúc. Chi tiết: [docs/setup/docker.md](docs/setup/docker.md).
 
 ```bash
 docker compose up -d --build   # lần đầu tự tạo .env từ .env.example + APP_KEY
@@ -72,10 +72,12 @@ git diff --check
 
 ## Tài liệu
 
-- [Đặc tả demo hiện tại](docs/ai-agent-auto-bug-fix-demo.md)
-- [Kiến trúc hai project](docs/agent-auto-fix-architecture.md)
-- [Security boundary](docs/agent-safe-execution-boundary.md)
-- [Checklist triển khai](docs/implementation-tasks.md)
-- [Technical Q&A](docs/technical-qa.md)
-- [Deploy Ubuntu VPS](docs/deployment-ubuntu-vps.md)
-- [Chạy bằng Docker](docs/docker.md)
+Xem [docs/README.md](docs/README.md). Tài liệu chia 3 nhóm:
+
+- **Build** — thiết kế và xây dựng dự án:
+  [đặc tả demo](docs/build/ai-agent-auto-bug-fix-demo.md),
+  [kiến trúc hai project](docs/build/agent-auto-fix-architecture.md),
+  [security boundary](docs/build/agent-safe-execution-boundary.md),
+  [checklist triển khai](docs/build/implementation-tasks.md)
+- **Setup** — chạy dự án: [Docker](docs/setup/docker.md)
+- **Q&A** — câu hỏi về kiến trúc: [technical Q&A](docs/qa/technical-qa.md)
