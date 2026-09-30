@@ -1,11 +1,11 @@
 # Chạy hai project bằng Docker
 
 `compose.yaml` ở project này chạy cả Laravel app lẫn companion orchestrator
-(`../demo-agent-ai-auto-fix-bug-backend`, đổi bằng `AI_FIX_BACKEND_PATH`).
+(`../sentinel-agent`, đổi bằng `AI_FIX_BACKEND_PATH`).
 
 | Service     | Nội dung                                                   | Truy cập                 |
 |-------------|------------------------------------------------------------|--------------------------|
-| `mysql`     | MySQL 8.4: DB `demo_agent_ai_auto_fix_bug` + DB `ai_fix_orchestrator` (user `aifix`) | `127.0.0.1:3307` |
+| `mysql`     | MySQL 8.4: DB `sentinel` (Laravel) + DB `ai_fix_orchestrator` (orchestrator), user/pass `sentinel`/`sentinel` | `127.0.0.1:3307` |
 | `app`       | PHP 8.3 built-in server, tự `composer install`, `npm ci/build`, `migrate` | http://localhost:8000 |
 | `watcher`   | `autofix_agent watch` — đọc `storage/logs/laravel.log`, tạo worktree, gọi Claude, verify, commit/PR | — |
 | `dashboard` | `autofix_agent ui`                                          | http://localhost:8787    |
@@ -16,7 +16,19 @@ lực ngay (restart `watcher`/`dashboard` sau khi sửa Python).
 
 ## Khởi động
 
+Yêu cầu duy nhất ở host: Docker + Docker Compose. Hai repo phải nằm cạnh nhau:
+
+```text
+Projects/
+├── sentinel-demo-app/   # repo này (chứa compose.yaml)
+└── sentinel-agent/      # orchestrator Python
+```
+
 ```bash
+cd sentinel-demo-app
+cp ../sentinel-agent/.env.example ../sentinel-agent/.env
+chmod 600 ../sentinel-agent/.env                  # điền GitHub/Telegram token nếu cần
+
 docker compose up -d --build
 
 # Lần đầu: đăng nhập Claude Code trong container (credentials lưu ở volume orchestrator-home)
@@ -28,21 +40,41 @@ docker compose exec app php artisan demo:user --email=demo@example.com
 docker compose logs -f watcher
 ```
 
+Container `app` tự tạo `.env` từ `.env.example` + `APP_KEY` nếu chưa có, rồi chạy `composer install`,
+`npm ci/build` và `migrate`.
+
 Dừng các process chạy tay ở host (`php artisan serve`, `make watch`, `make ui`) trước: hai
 watcher cùng đọc một log sẽ xử lý trùng incident.
+
+## Database
+
+| Database              | Dùng bởi              | User       | Password   |
+|-----------------------|-----------------------|------------|------------|
+| `sentinel`            | Laravel (`app`)       | `sentinel` | `sentinel` |
+| `ai_fix_orchestrator` | `watcher`, `dashboard`| `sentinel` | `sentinel` |
+
+Orchestrator dùng database riêng vì Laravel cũng có bảng `incidents`. Kết nối từ host (TablePlus,
+`mysql` CLI...): `mysql -h127.0.0.1 -P3307 -usentinel -psentinel sentinel`.
+
+User và database chỉ được tạo khi volume `mysql-data` khởi tạo lần đầu. Nếu trước đó đã chạy
+với user cũ (`laravel`/`aifix`), reset volume để áp dụng:
+
+```bash
+docker compose down -v
+docker compose up -d --build
+```
 
 ## Cấu hình
 
 - Orchestrator dùng `config/docker.json` (path trong container) và vẫn đọc `.env` của
   backend cho GitHub/Telegram token. `AI_FIX_DATABASE_URL` do compose đặt, ghi đè `.env`.
 - Laravel `.env` vẫn dùng; `DB_*` do compose đặt, ghi đè giá trị trong `.env`.
-- Đổi password/port bằng biến `DOCKER_MYSQL_ROOT_PASSWORD`, `DOCKER_LARAVEL_DB_PASSWORD`,
-  `DOCKER_AIFIX_DB_PASSWORD`, `DOCKER_MYSQL_PORT`, `DOCKER_APP_PORT`. Password chỉ áp dụng
-  khi volume `mysql-data` được tạo lần đầu.
+- Đổi root password/port bằng biến `DOCKER_MYSQL_ROOT_PASSWORD`, `DOCKER_MYSQL_PORT`,
+  `DOCKER_APP_PORT`. Root password chỉ áp dụng khi volume `mysql-data` được tạo lần đầu.
 - Dashboard bind `0.0.0.0` trong container (`AI_FIX_UI_BIND_HOST`) nhưng chỉ publish ra
   `127.0.0.1:8787`; Host header vẫn phải là loopback nên port host phải giữ 8787.
 - Worktree nằm ở volume `orchestrator-worktrees`; branch `ai-fix/...` được tạo trong
-  checkout Laravel của host, report ở `../demo-agent-ai-auto-fix-bug-backend/var/reports`.
+  checkout Laravel của host, report ở `../sentinel-agent/var/reports`.
 
 ## Lưu ý
 

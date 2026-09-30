@@ -7,7 +7,7 @@ sửa checkout đang phục vụ ứng dụng.
 Companion project:
 
 ```text
-/Users/wake/Documents/Projects/demo-agent-ai-auto-fix-bug-backend
+../sentinel-agent
 ```
 
 Backend Python theo dõi `storage/logs/laravel.log`, gom lỗi theo threshold, chạy Claude
@@ -28,42 +28,31 @@ Các artifact `IncidentRecorder` cũ vẫn có trong checkout local hiện tại
 định bằng `INCIDENT_RECORDING_ENABLED=false`; active demo flow chỉ đọc Laravel log từ
 project backend và không phụ thuộc các artifact này.
 
-## Cài đặt local
+## Cài đặt (Docker)
+
+Project chỉ hỗ trợ chạy bằng Docker; `compose.yaml` chạy Laravel, MySQL và orchestrator
+`../sentinel-agent` cùng lúc. Chi tiết: [docs/docker.md](docs/docker.md).
 
 ```bash
-composer install
-cp .env.example .env
-php artisan key:generate
-php artisan migrate
-npm ci
-npm run build
+docker compose up -d --build   # lần đầu tự tạo .env từ .env.example + APP_KEY
+docker compose run --rm watcher claude             # lần đầu: /login rồi /exit
+docker compose exec app php artisan demo:user --email=demo@example.com
 ```
 
-Cấu hình MySQL trong `.env`, giữ:
+MySQL: DB `sentinel`, user `sentinel`, password `sentinel` (host `127.0.0.1:3307`).
+Giữ trong `.env`:
 
 ```env
 INCIDENT_RECORDING_ENABLED=false
 AUTH_REGISTRATION_ENABLED=false
 ```
 
-Tạo/cập nhật demo user bằng prompt password ẩn:
-
-```bash
-php artisan demo:user --email=demo@example.com
-```
-
-Chạy ứng dụng:
-
-```bash
-php artisan serve
-```
-
-Khi phát triển frontend có thể chạy thêm `npm run dev`.
+Laravel: http://localhost:8000 — Dashboard: http://localhost:8787
 
 ## Chạy demo incident → PR
 
-1. Start Laravel project này.
-2. Start `make watch` và `make ui` trong companion backend.
+1. `docker compose up -d` (chạy cả Laravel, watcher và dashboard).
+2. Theo dõi watcher: `docker compose logs -f watcher`.
 3. Đăng nhập, mở `/profile`, xóa `phone` và submit ba lần trong 600 giây.
 4. Theo dõi các stage `OBSERVE → ANALYZE → GUARD → FIX → VERIFY → GIT → DONE` ở terminal
    backend hoặc dashboard http://localhost:8787.
@@ -75,9 +64,9 @@ Run thực tế đã được chứng minh bằng PR đầu tiên:
 ## Verification
 
 ```bash
-vendor/bin/pint --dirty --format agent
-php artisan test --compact
-npm run build
+docker compose exec app vendor/bin/pint --dirty --format agent
+docker compose exec app php artisan test --compact
+docker compose exec app npm run build
 git diff --check
 ```
 

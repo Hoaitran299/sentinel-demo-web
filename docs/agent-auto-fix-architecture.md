@@ -6,8 +6,8 @@ Hệ thống dùng hai project tách biệt:
 
 | Project | Vai trò |
 | --- | --- |
-| `demo-agent-ai-auto-fix-bug` | Laravel application/data plane; phục vụ web và ghi log |
-| `demo-agent-ai-auto-fix-bug-backend` | Python control plane; observe, threshold, agent, Git, verification, PR và dashboard |
+| `sentinel-demo-app` | Laravel application/data plane; phục vụ web và ghi log |
+| `sentinel-agent` | Python control plane; observe, threshold, agent, Git, verification, PR và dashboard |
 
 Kiến trúc cũ đặt incident tables, database queue và agent coordinator trong Laravel đã bị
 thay thế. Redis không được sử dụng. Database MySQL riêng của backend
